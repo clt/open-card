@@ -1,5 +1,15 @@
 import { expect, test } from "bun:test";
-import { addPlayer, addStandardDeck, createZone, cutZone, dealCards, moveCards, shuffleZone } from "../src/domain/operations";
+import {
+  addPlayer,
+  addStandardDeck,
+  createZone,
+  cutZone,
+  dealCards,
+  moveCards,
+  passDealerPosition,
+  setDealer,
+  shuffleZone,
+} from "../src/domain/operations";
 import { createTable } from "../src/domain/table";
 
 test("cut preserves card set and moves the top segment to the bottom", () => {
@@ -115,4 +125,78 @@ test("deal distributes cards round-robin", () => {
   expect(hands[2]!.cardIds).toEqual([original[2]!, original[6]!]);
   expect(hands[3]!.cardIds).toEqual([original[3]!, original[7]!]);
   expect(draw.cardIds).toHaveLength(44);
+});
+
+test("dealer actor and position can be set and cleared independently", () => {
+  const table = createTable();
+  const alice = addPlayer(table, { name: "Alice" });
+  const bob = addPlayer(table, { name: "Bob" });
+
+  setDealer(table, {
+    actor: { type: "player", playerId: alice.id },
+    positionPlayerId: bob.id,
+  });
+
+  expect(table.dealer).toEqual({
+    actor: { type: "player", playerId: alice.id },
+    positionPlayerId: bob.id,
+  });
+
+  setDealer(table, { actor: { type: "nonPlayer", name: "House" } });
+
+  expect(table.dealer).toEqual({
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: bob.id,
+  });
+
+  setDealer(table, { actor: null, positionPlayerId: null });
+
+  expect(table.dealer).toEqual({ actor: null, positionPlayerId: null });
+});
+
+test("dealer player references must exist", () => {
+  const table = createTable();
+
+  expect(() => setDealer(table, { actor: { type: "player", playerId: "missing_player" } })).toThrow("missing_player");
+  expect(() => setDealer(table, { positionPlayerId: "missing_player" })).toThrow("missing_player");
+});
+
+test("passing dealer position follows player join order and preserves actor", () => {
+  const table = createTable();
+  const alice = addPlayer(table, { name: "Alice" });
+  const bob = addPlayer(table, { name: "Bob" });
+  const carol = addPlayer(table, { name: "Carol" });
+
+  setDealer(table, {
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: alice.id,
+  });
+
+  passDealerPosition(table);
+  expect(table.dealer).toEqual({
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: bob.id,
+  });
+
+  passDealerPosition(table);
+  expect(table.dealer.positionPlayerId).toBe(carol.id);
+
+  passDealerPosition(table);
+  expect(table.dealer.positionPlayerId).toBe(alice.id);
+
+  passDealerPosition(table, { direction: "previous" });
+  expect(table.dealer.positionPlayerId).toBe(carol.id);
+});
+
+test("passing dealer position requires an existing position and does not mutate actor", () => {
+  const table = createTable();
+  const alice = addPlayer(table, { name: "Alice" });
+
+  setDealer(table, { actor: { type: "player", playerId: alice.id } });
+
+  expect(() => passDealerPosition(table)).toThrow("Dealer position is not set.");
+  expect(table.dealer).toEqual({
+    actor: { type: "player", playerId: alice.id },
+    positionPlayerId: null,
+  });
 });

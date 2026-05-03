@@ -13,6 +13,35 @@ export const addPlayerSchema = z.object({
   name: z.string().trim().min(1).max(80),
 });
 
+const dealerActorSchema = z.discriminatedUnion("type", [
+  z.object({
+    type: z.literal("player"),
+    playerId: idSchema,
+  }),
+  z.object({
+    type: z.literal("nonPlayer"),
+    name: z.string().trim().min(1).max(80),
+  }),
+]);
+
+export const setDealerSchema = z
+  .object({
+    actor: dealerActorSchema.nullable().optional(),
+    positionPlayerId: idSchema.nullable().optional(),
+    actorPlayerId: idSchema.optional(),
+  })
+  .refine((value) => value.actor !== undefined || value.positionPlayerId !== undefined, {
+    message: "Dealer update requires actor or positionPlayerId.",
+  });
+
+export const passDealerSchema = z.preprocess(
+  (value) => value ?? {},
+  z.object({
+    direction: z.enum(["next", "previous"]).default("next"),
+    actorPlayerId: idSchema.optional(),
+  }),
+);
+
 const defaultVisibilitySchema = z.union([
   z.literal("none").transform(() => ({ type: "none" as const })),
   z.literal("everyone").transform(() => ({ type: "everyone" as const })),

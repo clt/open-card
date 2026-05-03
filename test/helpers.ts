@@ -21,8 +21,18 @@ export type ProjectedPlayer = {
   name: string;
 };
 
+export type DealerActor =
+  | { type: "player"; playerId: string }
+  | { type: "nonPlayer"; name: string };
+
+export type DealerState = {
+  actor: DealerActor | null;
+  positionPlayerId: string | null;
+};
+
 export type ProjectedTable = {
   id: string;
+  dealer: DealerState;
   players: ProjectedPlayer[];
   zones: ProjectedZone[];
 };
@@ -70,6 +80,31 @@ export async function addDeck(tableId: string, zoneId: string) {
   const response = await api("POST", `/tables/${tableId}/decks`, { zoneId });
   expect(response.status).toBe(200);
   return json<{ cardsAdded: number; table: ProjectedTable }>(response);
+}
+
+export async function setDealer(
+  tableId: string,
+  input: {
+    actor?: DealerActor | null;
+    positionPlayerId?: string | null;
+    actorPlayerId?: string;
+  },
+) {
+  const response = await api("POST", `/tables/${tableId}/dealer`, input);
+  expect(response.status).toBe(200);
+  return json<{ dealer: DealerState; table: ProjectedTable }>(response);
+}
+
+export async function passDealer(
+  tableId: string,
+  input: {
+    direction?: "next" | "previous";
+    actorPlayerId?: string;
+  } = {},
+) {
+  const response = await api("POST", `/tables/${tableId}/dealer/pass`, input);
+  expect(response.status).toBe(200);
+  return json<{ dealer: DealerState; table: ProjectedTable }>(response);
 }
 
 export async function getTable(tableId: string, viewerPlayerId?: string): Promise<ProjectedTable> {

@@ -13,6 +13,15 @@ export type Player = {
   createdAt: string;
 };
 
+export type DealerActor =
+  | { type: "player"; playerId: string }
+  | { type: "nonPlayer"; name: string };
+
+export type DealerState = {
+  actor: DealerActor | null;
+  positionPlayerId: string | null;
+};
+
 export type Zone = {
   id: string;
   name: string;
@@ -26,6 +35,7 @@ export type Table = {
   id: string;
   name?: string;
   players: Record<string, Player>;
+  dealer: DealerState;
   zones: Record<string, Zone>;
   cards: Record<string, Card>;
   events: TableEvent[];
@@ -45,6 +55,7 @@ export function createTable(input: { name?: string } = {}): Table {
     id: `table_${crypto.randomUUID()}`,
     name: input.name,
     players: {},
+    dealer: { actor: null, positionPlayerId: null },
     zones: {},
     cards: {},
     events: [],

@@ -1,5 +1,5 @@
 import type { Card } from "./card";
-import type { Table, Zone } from "./table";
+import type { DealerState, Table, Zone } from "./table";
 
 export type ProjectedCard =
   | {
@@ -22,6 +22,7 @@ export type ProjectedTable = {
   name?: string;
   createdAt: string;
   updatedAt: string;
+  dealer: DealerState;
   players: Array<{
     id: string;
     name: string;
@@ -43,6 +44,7 @@ export function projectTable(table: Table, viewerPlayerId?: string): ProjectedTa
     name: table.name,
     createdAt: table.createdAt,
     updatedAt: table.updatedAt,
+    dealer: projectDealer(table.dealer),
     players: Object.values(table.players),
     zones: Object.values(table.zones).map((zone) => ({
       id: zone.id,
@@ -52,6 +54,13 @@ export function projectTable(table: Table, viewerPlayerId?: string): ProjectedTa
       count: zone.cardIds.length,
       cards: zone.cardIds.map((cardId) => projectCard(table.cards[cardId]!, viewerPlayerId)),
     })),
+  };
+}
+
+function projectDealer(dealer: DealerState): DealerState {
+  return {
+    actor: dealer.actor === null ? null : { ...dealer.actor },
+    positionPlayerId: dealer.positionPlayerId,
   };
 }
 

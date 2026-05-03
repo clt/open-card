@@ -9,7 +9,9 @@ import {
   flipCards,
   hideCards,
   moveCards,
+  passDealerPosition,
   revealCards,
+  setDealer,
   shuffleZone,
 } from "../domain/operations";
 import { createTable } from "../domain/table";
@@ -29,7 +31,9 @@ import {
   flipCardsSchema,
   hideCardsSchema,
   moveCardsSchema,
+  passDealerSchema,
   revealCardsSchema,
+  setDealerSchema,
   shuffleZoneSchema,
 } from "./schemas";
 
@@ -102,6 +106,18 @@ export function createRouter(store: TableStore = memoryStore) {
         const body = await parseBody(request, addDeckSchema);
         addStandardDeck(table, body);
         return json({ cardsAdded: 52, table: projectTable(table, body.actorPlayerId) });
+      }
+
+      if (segments.length === 3 && segments[2] === "dealer") {
+        const body = await parseBody(request, setDealerSchema);
+        const dealer = setDealer(table, body);
+        return json({ dealer, table: projectTable(table, body.actorPlayerId) });
+      }
+
+      if (segments.length === 4 && segments[2] === "dealer" && segments[3] === "pass") {
+        const body = await parseBody(request, passDealerSchema);
+        const dealer = passDealerPosition(table, body);
+        return json({ dealer, table: projectTable(table, body.actorPlayerId) });
       }
 
       if (segments.length === 5 && segments[2] === "zones" && segments[3] !== undefined) {

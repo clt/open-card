@@ -298,7 +298,7 @@ export function acceptanceResultsPage(): string {
       <header>
         <div>
           <h1>Acceptance Results</h1>
-          <p class="lede">The page runs the public API through two real table setups and displays each physical-table assertion.</p>
+          <p class="lede">The page runs the public API through real table setups and displays each physical-table assertion.</p>
         </div>
         <div class="actions">
           <span id="overall-status" class="pill" data-testid="overall-status">Queued</span>
@@ -307,7 +307,7 @@ export function acceptanceResultsPage(): string {
       </header>
 
       <section class="metrics" aria-label="Acceptance summary">
-        <div class="metric"><span>Scenarios</span><strong id="metric-scenarios">0/2</strong></div>
+        <div class="metric"><span>Scenarios</span><strong id="metric-scenarios">0/3</strong></div>
         <div class="metric"><span>Assertions</span><strong id="metric-assertions">0/0</strong></div>
         <div class="metric"><span>Cards checked</span><strong id="metric-cards">0</strong></div>
         <div class="metric"><span>Last run</span><strong id="metric-last-run">Pending</strong></div>
@@ -318,6 +318,12 @@ export function acceptanceResultsPage(): string {
 
     <script>
       const scenarios = [
+        {
+          id: "dealer",
+          title: "Dealer",
+          subtitle: "Non-player dealer, player position, pass, events",
+          run: runDealer,
+        },
         {
           id: "holdem",
           title: "Texas hold'em",
@@ -475,6 +481,14 @@ export function acceptanceResultsPage(): string {
         return request("GET", "/tables/" + tableId + suffix);
       }
 
+      function playerName(players, playerId) {
+        const player = players.find(function (candidate) {
+          return candidate.id === playerId;
+        });
+
+        return player ? player.name : "None";
+      }
+
       function zoneByName(table, name) {
         const zone = table.zones.find(function (candidate) {
           return candidate.name === name;
@@ -493,6 +507,73 @@ export function acceptanceResultsPage(): string {
             return card.id;
           });
         });
+      }
+
+      async function runDealer(view) {
+        const table = await request("POST", "/tables", { name: "Dealer acceptance" });
+        const alice = await addPlayer(table.id, "Alice");
+        const bob = await addPlayer(table.id, "Bob");
+        const carol = await addPlayer(table.id, "Carol");
+        const players = [alice, bob, carol];
+        addStep(view, "Table created", table.id);
+
+        await request("POST", "/tables/" + table.id + "/dealer", {
+          actor: { type: "nonPlayer", name: "House" },
+          positionPlayerId: alice.id,
+        });
+        addStep(view, "Dealer set", "House deals while Alice holds the dealer position");
+
+        const initial = await getTable(table.id);
+        const passedToBob = await request("POST", "/tables/" + table.id + "/dealer/pass", {});
+        const passedToCarol = await request("POST", "/tables/" + table.id + "/dealer/pass", {});
+        const wrappedToAlice = await request("POST", "/tables/" + table.id + "/dealer/pass", {});
+        addStep(view, "Position passed", "Alice to Bob to Carol to Alice");
+
+        await request("POST", "/tables/" + table.id + "/dealer", {
+          actor: { type: "player", playerId: alice.id },
+          positionPlayerId: alice.id,
+        });
+        const playerDealerPassed = await request("POST", "/tables/" + table.id + "/dealer/pass", {
+          actorPlayerId: bob.id,
+        });
+        addStep(view, "Player dealer checked", "Alice remains actor while position passes to Bob");
+
+        const draw = await addZone(table.id, { name: "Draw" });
+        const aliceHand = await addZone(table.id, { name: "Alice Hand", ownerPlayerId: alice.id });
+        const bobHand = await addZone(table.id, { name: "Bob Hand", ownerPlayerId: bob.id });
+        const deck = await request("POST", "/tables/" + table.id + "/decks", { zoneId: draw.id });
+        const originalDeckIds = zoneByName(deck.table, "Draw").cards.map(function (card) {
+          return card.id;
+        });
+
+        await request("POST", "/tables/" + table.id + "/deal", {
+          fromZoneId: draw.id,
+          toZoneIds: [aliceHand.id, bobHand.id],
+          cardsPerTarget: 2,
+          from: "top",
+          to: "bottom",
+          actorPlayerId: bob.id,
+        });
+        addStep(view, "Generic deal allowed", "Bob can perform a physical deal without dealer enforcement");
+
+        const projected = await getTable(table.id);
+        const events = await request("GET", "/tables/" + table.id + "/events");
+        const cardIds = allCardIds(projected);
+        state.cardsChecked += cardIds.length;
+
+        setCounts(view, [
+          { label: "Players", value: players.length },
+          { label: "Actor", value: projected.dealer.actor && projected.dealer.actor.type === "player" ? "Alice" : "None" },
+          { label: "Position", value: playerName(players, projected.dealer.positionPlayerId) },
+          { label: "Cards", value: cardIds.length },
+        ]);
+
+        assertResult(view, "non-player dealer set", "House is actor and Alice has the position.", initial.dealer.actor.type === "nonPlayer" && initial.dealer.actor.name === "House" && initial.dealer.positionPlayerId === alice.id);
+        assertResult(view, "position passes and wraps", "Position advances Alice, Bob, Carol, Alice.", passedToBob.dealer.positionPlayerId === bob.id && passedToCarol.dealer.positionPlayerId === carol.id && wrappedToAlice.dealer.positionPlayerId === alice.id);
+        assertResult(view, "actor independent from position", "Alice remains actor while Bob holds position.", playerDealerPassed.dealer.actor.type === "player" && playerDealerPassed.dealer.actor.playerId === alice.id && playerDealerPassed.dealer.positionPlayerId === bob.id);
+        assertResult(view, "deal remains generic", "Hands receive cards and dealer state is unchanged.", zoneByName(projected, "Alice Hand").count === 2 && zoneByName(projected, "Bob Hand").count === 2 && projected.dealer.actor.type === "player" && projected.dealer.actor.playerId === alice.id && projected.dealer.positionPlayerId === bob.id);
+        assertResult(view, "52 physical card IDs preserved", "All zones together still make up the original deck.", sortedEqual(cardIds, originalDeckIds));
+        assertResult(view, "dealer events are safe", "Public events include dealer changes without metadata.", events.events.some(function (event) { return event.type === "dealer.updated"; }) && events.events.some(function (event) { return event.type === "dealer.passed"; }) && events.events.every(function (event) { return !("metadata" in event); }));
       }
 
       async function runHoldem(view) {
