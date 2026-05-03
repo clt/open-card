@@ -1,9 +1,87 @@
 import { afterEach, expect, test } from "bun:test";
 import { memoryStore } from "../src/store/memoryStore";
-import { addDeck, addPlayer, addZone, allCardIds, api, createTable, getTable, zoneByName } from "./helpers";
+import {
+  addDeck,
+  addPlayer,
+  addZone,
+  allCardIds,
+  api,
+  createTable,
+  getTable,
+  passDealer,
+  setDealer,
+  zoneByName,
+} from "./helpers";
 
 afterEach(() => {
   memoryStore.reset();
+});
+
+test("acceptance: non-player dealer keeps dealing while player position passes and wraps", async () => {
+  const table = await createTable("Dealer rotation table");
+  const alice = (await addPlayer(table.id, "Alice")).player;
+  const bob = (await addPlayer(table.id, "Bob")).player;
+  const carol = (await addPlayer(table.id, "Carol")).player;
+
+  await setDealer(table.id, {
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: alice.id,
+  });
+
+  expect((await getTable(table.id)).dealer).toEqual({
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: alice.id,
+  });
+
+  expect((await passDealer(table.id)).dealer).toEqual({
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: bob.id,
+  });
+  expect((await passDealer(table.id)).dealer.positionPlayerId).toBe(carol.id);
+  expect((await passDealer(table.id)).dealer.positionPlayerId).toBe(alice.id);
+});
+
+test("acceptance: dealer actor is independent from position and does not gate generic dealing", async () => {
+  const table = await createTable("Dealer generic deal table");
+  const alice = (await addPlayer(table.id, "Alice")).player;
+  const bob = (await addPlayer(table.id, "Bob")).player;
+  const draw = (await addZone(table.id, { name: "Draw" })).zone;
+  const aliceHand = (await addZone(table.id, { name: "Alice Hand", ownerPlayerId: alice.id })).zone;
+  const bobHand = (await addZone(table.id, { name: "Bob Hand", ownerPlayerId: bob.id })).zone;
+
+  await setDealer(table.id, {
+    actor: { type: "player", playerId: alice.id },
+    positionPlayerId: alice.id,
+  });
+
+  expect((await passDealer(table.id, { actorPlayerId: bob.id })).dealer).toEqual({
+    actor: { type: "player", playerId: alice.id },
+    positionPlayerId: bob.id,
+  });
+
+  const deckResponse = await addDeck(table.id, draw.id);
+  const originalDeckIds = zoneByName(deckResponse.table, "Draw").cards.map((card) => card.id);
+  const dealResponse = await api("POST", `/tables/${table.id}/deal`, {
+    fromZoneId: draw.id,
+    toZoneIds: [aliceHand.id, bobHand.id],
+    cardsPerTarget: 2,
+    from: "top",
+    to: "bottom",
+    actorPlayerId: bob.id,
+  });
+
+  expect(dealResponse.status).toBe(200);
+
+  const projected = await getTable(table.id);
+
+  expect(projected.dealer).toEqual({
+    actor: { type: "player", playerId: alice.id },
+    positionPlayerId: bob.id,
+  });
+  expect(zoneByName(projected, "Alice Hand").count).toBe(2);
+  expect(zoneByName(projected, "Bob Hand").count).toBe(2);
+  expect([...allCardIds(projected)].sort()).toEqual([...originalDeckIds].sort());
+  expect(new Set(allCardIds(projected)).size).toBe(52);
 });
 
 test("acceptance: 5 players can physically deal Texas hold'em through the generic API", async () => {

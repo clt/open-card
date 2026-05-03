@@ -1,6 +1,8 @@
 export type EventType =
   | "table.created"
   | "player.joined"
+  | "dealer.updated"
+  | "dealer.passed"
   | "zone.created"
   | "deck.added"
   | "zone.shuffled"

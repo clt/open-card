@@ -9,7 +9,7 @@ import {
   nextZoneId,
   visibilityFromZone,
 } from "./table";
-import type { DefaultVisibility, Player, Table, Zone } from "./table";
+import type { DealerActor, DealerState, DefaultVisibility, Player, Table, Zone } from "./table";
 
 export type CountMoveSelection = {
   type: "count";
@@ -51,6 +51,78 @@ export function addPlayer(table: Table, input: { name: string }): Player {
   });
 
   return player;
+}
+
+export function setDealer(
+  table: Table,
+  input: {
+    actor?: DealerActor | null;
+    positionPlayerId?: string | null;
+    actorPlayerId?: string;
+  },
+): DealerState {
+  validateActor(table, input.actorPlayerId);
+
+  if (input.actor === undefined && input.positionPlayerId === undefined) {
+    badRequest("Dealer update requires actor or positionPlayerId.");
+  }
+
+  const actor = input.actor === undefined ? table.dealer.actor : validateDealerActor(table, input.actor);
+  const positionPlayerId =
+    input.positionPlayerId === undefined ? table.dealer.positionPlayerId : validateDealerPosition(table, input.positionPlayerId);
+
+  table.dealer = { actor, positionPlayerId };
+  appendEvent(table, {
+    type: "dealer.updated",
+    actorPlayerId: input.actorPlayerId,
+    summary: "Dealer updated.",
+    metadata: { dealer: table.dealer },
+  });
+
+  return table.dealer;
+}
+
+export function passDealerPosition(
+  table: Table,
+  input: {
+    direction?: "next" | "previous";
+    actorPlayerId?: string;
+  } = {},
+): DealerState {
+  validateActor(table, input.actorPlayerId);
+
+  const currentPositionPlayerId = table.dealer.positionPlayerId;
+
+  if (currentPositionPlayerId === null) {
+    conflict("Dealer position is not set.");
+  }
+
+  const players = Object.values(table.players);
+  const currentIndex = players.findIndex((player) => player.id === currentPositionPlayerId);
+
+  if (currentIndex === -1) {
+    notFound(`Player ${currentPositionPlayerId} not found.`);
+  }
+
+  const direction = input.direction ?? "next";
+  const offset = direction === "previous" ? -1 : 1;
+  const nextIndex = (currentIndex + offset + players.length) % players.length;
+  const currentPlayer = players[currentIndex]!;
+  const nextPlayer = players[nextIndex]!;
+
+  table.dealer = { ...table.dealer, positionPlayerId: nextPlayer.id };
+  appendEvent(table, {
+    type: "dealer.passed",
+    actorPlayerId: input.actorPlayerId,
+    summary: `Dealer position passed from ${currentPlayer.name} to ${nextPlayer.name}.`,
+    metadata: {
+      direction,
+      fromPlayerId: currentPlayer.id,
+      toPlayerId: nextPlayer.id,
+    },
+  });
+
+  return table.dealer;
 }
 
 export function createZone(
@@ -459,6 +531,22 @@ function validateActor(table: Table, actorPlayerId?: string): void {
   if (actorPlayerId !== undefined) {
     requirePlayer(table, actorPlayerId);
   }
+}
+
+function validateDealerActor(table: Table, actor: DealerActor | null): DealerActor | null {
+  if (actor?.type === "player") {
+    requirePlayer(table, actor.playerId);
+  }
+
+  return actor;
+}
+
+function validateDealerPosition(table: Table, positionPlayerId: string | null): string | null {
+  if (positionPlayerId !== null) {
+    requirePlayer(table, positionPlayerId);
+  }
+
+  return positionPlayerId;
 }
 
 function validateDefaultVisibilityPlayers(table: Table, defaultVisibility?: DefaultVisibility): void {
