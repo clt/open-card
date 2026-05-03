@@ -1,0 +1,118 @@
+import { expect, test } from "bun:test";
+import { addPlayer, addStandardDeck, createZone, cutZone, dealCards, moveCards, shuffleZone } from "../src/domain/operations";
+import { createTable } from "../src/domain/table";
+
+test("cut preserves card set and moves the top segment to the bottom", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const original = [...draw.cardIds];
+
+  cutZone(table, { zoneId: draw.id, at: 13 });
+
+  expect(draw.cardIds).toHaveLength(52);
+  expect([...draw.cardIds].sort()).toEqual([...original].sort());
+  expect(draw.cardIds[0]).toBe(original[13]);
+  expect(draw.cardIds.at(-1)).toBe(original[12]);
+});
+
+test("shuffle preserves the exact card set", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const original = [...draw.cardIds];
+
+  shuffleZone(table, { zoneId: draw.id });
+
+  expect(draw.cardIds).toHaveLength(52);
+  expect([...draw.cardIds].sort()).toEqual([...original].sort());
+});
+
+test("move supports count from top and bottom while preserving order", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  const discard = createZone(table, { name: "Discard" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const original = [...draw.cardIds];
+
+  const topMoved = moveCards(table, {
+    fromZoneId: draw.id,
+    toZoneId: discard.id,
+    selection: { type: "count", count: 2, from: "top" },
+    to: "bottom",
+  });
+  const bottomMoved = moveCards(table, {
+    fromZoneId: draw.id,
+    toZoneId: discard.id,
+    selection: { type: "count", count: 2, from: "bottom" },
+    to: "bottom",
+  });
+
+  expect(topMoved).toEqual([original[0]!, original[1]!]);
+  expect(bottomMoved).toEqual([original[50]!, original[51]!]);
+  expect(discard.cardIds).toEqual([original[0]!, original[1]!, original[50]!, original[51]!]);
+  expect(draw.cardIds).toHaveLength(48);
+});
+
+test("move by explicit card IDs preserves requested order and can insert on top", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  const hand = createZone(table, { name: "Hand" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const original = [...draw.cardIds];
+
+  const moved = moveCards(table, {
+    fromZoneId: draw.id,
+    toZoneId: hand.id,
+    selection: { type: "cardIds", cardIds: [original[4]!, original[1]!, original[3]!] },
+    to: "top",
+  });
+
+  expect(moved).toEqual([original[4]!, original[1]!, original[3]!]);
+  expect(hand.cardIds).toEqual([original[4]!, original[1]!, original[3]!]);
+  expect(draw.cardIds).not.toContain(original[4]!);
+  expect(new Set([...draw.cardIds, ...hand.cardIds]).size).toBe(52);
+});
+
+test("failed explicit move does not mutate either zone", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  const hand = createZone(table, { name: "Hand" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const originalDraw = [...draw.cardIds];
+
+  expect(() =>
+    moveCards(table, {
+      fromZoneId: draw.id,
+      toZoneId: hand.id,
+      selection: { type: "cardIds", cardIds: [originalDraw[0]!, "missing_card"] },
+      to: "bottom",
+    }),
+  ).toThrow("missing_card");
+
+  expect(draw.cardIds).toEqual(originalDraw);
+  expect(hand.cardIds).toEqual([]);
+});
+
+test("deal distributes cards round-robin", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  const players = ["North", "East", "South", "West"].map((name) => addPlayer(table, { name }));
+  const hands = players.map((player) => createZone(table, { name: `${player.name} Hand`, ownerPlayerId: player.id }));
+  addStandardDeck(table, { zoneId: draw.id });
+  const original = [...draw.cardIds];
+
+  dealCards(table, {
+    fromZoneId: draw.id,
+    toZoneIds: hands.map((hand) => hand.id),
+    cardsPerTarget: 2,
+    from: "top",
+    to: "bottom",
+  });
+
+  expect(hands[0]!.cardIds).toEqual([original[0]!, original[4]!]);
+  expect(hands[1]!.cardIds).toEqual([original[1]!, original[5]!]);
+  expect(hands[2]!.cardIds).toEqual([original[2]!, original[6]!]);
+  expect(hands[3]!.cardIds).toEqual([original[3]!, original[7]!]);
+  expect(draw.cardIds).toHaveLength(44);
+});
