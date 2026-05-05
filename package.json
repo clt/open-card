@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
+    "sample:big2": "bun examples/big2-demo/server.ts",
+    "sample:big2:api": "bun run start",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit"
   },

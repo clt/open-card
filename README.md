@@ -20,6 +20,24 @@ bun test
 bun run typecheck
 ```
 
+## Samples
+
+The Big 2 browser demo lives in `examples/big2-demo`. Run the API and sample UI in separate terminals.
+
+Terminal 1:
+
+```sh
+bun run sample:big2:api
+```
+
+Terminal 2:
+
+```sh
+bun run sample:big2
+```
+
+Then open `http://localhost:3001`.
+
 ## API
 
 ```text
