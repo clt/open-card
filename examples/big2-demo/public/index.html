@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Open Card Big 2 Demo</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Open Card sample</p>
+          <h1>Big 2 table</h1>
+        </div>
+        <div class="api-controls">
+          <label>
+            <span>API</span>
+            <input id="api-url" type="url" spellcheck="false" />
+          </label>
+          <button id="check-api" type="button">Check</button>
+          <button id="new-game" type="button" class="primary">New hand</button>
+        </div>
+      </header>
+
+      <section class="control-strip" aria-label="Game controls">
+        <div class="segmented" aria-label="Run mode">
+          <button type="button" data-mode="step" class="is-active">Step</button>
+          <button type="button" data-mode="auto">Auto</button>
+        </div>
+        <label class="select-control">
+          <span>Manual seat</span>
+          <select id="manual-player"></select>
+        </label>
+        <button id="step-turn" type="button">Step AI</button>
+        <button id="play-selected" type="button" class="primary">Play</button>
+        <button id="pass-turn" type="button">Pass</button>
+        <p id="validation-text" class="validation">No manual turn.</p>
+      </section>
+
+      <section class="status-row" aria-live="polite">
+        <p id="status-text">Ready.</p>
+        <p id="table-meta">No active table.</p>
+      </section>
+
+      <section class="table-layout" aria-label="Big 2 table">
+        <div id="players-grid" class="players-grid"></div>
+        <aside id="current-play" class="current-play"></aside>
+      </section>
+
+      <section class="debug-layout" aria-label="Debug logs">
+        <section>
+          <h2>Game</h2>
+          <ol id="game-log-list" class="log-list"></ol>
+        </section>
+        <section>
+          <h2>Open Card events</h2>
+          <ol id="events-list" class="log-list"></ol>
+        </section>
+        <section>
+          <h2>API transcript</h2>
+          <ol id="api-log-list" class="log-list"></ol>
+        </section>
+      </section>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
