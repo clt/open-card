@@ -390,36 +390,25 @@ async function commitPlay(player: Player, combo: Combo, cards: KnownCard[]): Pro
   state.status = `${player.name} played ${combo.label}.`;
 }
 
-async function clearCurrentPlay(actorPlayerId: string): Promise<void> {
+async function clearCurrentPlay(actorPlayerId: string, count = state.snapshot?.currentPlayCount ?? 0): Promise<void> {
   const snapshot = state.snapshot;
   const zones = requireZones();
 
-  if (snapshot === null || snapshot.currentPlayCount === 0) {
+  if (snapshot === null || count === 0) {
     return;
   }
 
   await api().moveCards(requireTableId(), {
     fromZoneId: zones.currentPlay,
     toZoneId: zones.finishedPile,
-    selection: { type: "count", count: snapshot.currentPlayCount, from: "top" },
+    selection: { type: "count", count, from: "top" },
     to: "bottom",
     actorPlayerId,
   });
 }
 
 async function finishCurrentRound(winner: Player, winningPlay: ActivePlay, actorPlayerId: string): Promise<void> {
-  const turns = state.currentRoundTurns.length > 0
-    ? [...state.currentRoundTurns]
-    : [
-        {
-          id: nextRoundTurnId(),
-          action: "play" as const,
-          playerId: winningPlay.playerId,
-          playerName: winningPlay.playerName,
-          comboLabel: winningPlay.combo.label,
-          cards: winningPlay.cards,
-        },
-      ];
+  const turns = [...state.currentRoundTurns];
   const totalCards = turns.reduce((total, turn) => total + (turn.action === "play" ? turn.cards.length : 0), 0);
 
   state.wonRoundSequence += 1;
@@ -434,7 +423,7 @@ async function finishCurrentRound(winner: Player, winningPlay: ActivePlay, actor
     totalCards,
   });
   state.currentRoundTurns = [];
-  await clearCurrentPlay(actorPlayerId);
+  await clearCurrentPlay(actorPlayerId, winningPlay.cards.length);
 }
 
 function appendRoundPlay(player: Player, combo: Combo, cards: KnownCard[]): void {
@@ -1034,5 +1023,6 @@ function escapeHtml(value: string): string {
     .replaceAll("&", "&amp;")
     .replaceAll("<", "&lt;")
     .replaceAll(">", "&gt;")
-    .replaceAll("\"", "&quot;");
+    .replaceAll("\"", "&quot;")
+    .replaceAll("'", "&#39;");
 }
