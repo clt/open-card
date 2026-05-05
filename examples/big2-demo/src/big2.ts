@@ -188,7 +188,13 @@ export function legalPlays(hand: KnownCard[], context: PlayContext): CandidatePl
 }
 
 export function chooseAutomatedPlay(hand: KnownCard[], context: PlayContext): CandidatePlay | null {
-  return legalPlays(hand, context)[0] ?? null;
+  const candidates = legalPlays(hand, context);
+
+  if (context.activePlay !== null) {
+    return candidates[0] ?? null;
+  }
+
+  return candidates.sort(compareLeadCandidatePlays)[0] ?? null;
 }
 
 export function containsCardCode(cards: KnownCard[], code: string): boolean {
@@ -257,6 +263,32 @@ function compareCandidatePlays(a: CandidatePlay, b: CandidatePlay, activePlay: C
   }
 
   return compareStrength(a.combo.strength, b.combo.strength);
+}
+
+function compareLeadCandidatePlays(a: CandidatePlay, b: CandidatePlay): number {
+  const sizeDifference = leadSizePriority(b.combo) - leadSizePriority(a.combo);
+
+  if (sizeDifference !== 0) {
+    return sizeDifference;
+  }
+
+  return compareCandidatePlays(a, b, null);
+}
+
+function leadSizePriority(combo: Combo): number {
+  if (combo.size === 5) {
+    return 4;
+  }
+
+  if (combo.kind === "triple") {
+    return 3;
+  }
+
+  if (combo.kind === "pair") {
+    return 2;
+  }
+
+  return 1;
 }
 
 function makeCombo(kind: ComboKind, cards: KnownCard[], strength: number[]): Combo {
