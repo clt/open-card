@@ -130,6 +130,44 @@ test("deal distributes cards round-robin", () => {
   expect(draw.cardIds).toHaveLength(44);
 });
 
+test("deal rejects duplicate target zones", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  const hand = createZone(table, { name: "Hand" });
+  addStandardDeck(table, { zoneId: draw.id });
+
+  expect(() =>
+    dealCards(table, {
+      fromZoneId: draw.id,
+      toZoneIds: [hand.id, hand.id],
+      cardsPerTarget: 1,
+      from: "top",
+      to: "bottom",
+    }),
+  ).toThrow("unique");
+});
+
+test("deal rejects when the source zone has insufficient cards", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  const north = createZone(table, { name: "North" });
+  const south = createZone(table, { name: "South" });
+  addStandardDeck(table, { zoneId: draw.id });
+
+  expect(() =>
+    dealCards(table, {
+      fromZoneId: draw.id,
+      toZoneIds: [north.id, south.id],
+      cardsPerTarget: 27,
+      from: "top",
+      to: "bottom",
+    }),
+  ).toThrow();
+
+  expect(draw.cardIds).toHaveLength(52);
+  expect(north.cardIds).toHaveLength(0);
+});
+
 test("dealer actor and position can be set and cleared independently", () => {
   const table = createTable();
   const alice = addPlayer(table, { name: "Alice" });
