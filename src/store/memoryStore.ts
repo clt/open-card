@@ -5,6 +5,7 @@ export interface TableStore {
   create(table: Table): Table;
   get(tableId: string): Table | undefined;
   require(tableId: string): Table;
+  update(table: Table): void;
   list(): Table[];
   reset(): void;
 }
@@ -28,7 +29,11 @@ export class MemoryTableStore implements TableStore {
       notFound(`Table ${tableId} not found.`);
     }
 
-    return table;
+    return structuredClone(table);
+  }
+
+  update(table: Table): void {
+    this.tables.set(table.id, table);
   }
 
   list(): Table[] {

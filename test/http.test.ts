@@ -1,5 +1,6 @@
 import { afterEach, expect, test } from "bun:test";
 import { memoryStore } from "../src/store/memoryStore";
+import { createTable as createDomainTable } from "../src/domain/table";
 import { addDeck, addPlayer, addZone, api, createTable, getTable, json, passDealer, setDealer, zoneByName } from "./helpers";
 
 afterEach(() => {
@@ -170,4 +171,35 @@ test("dealer events are public summaries without metadata", async () => {
     }),
   );
   expect(body.events.every((event) => !("metadata" in event))).toBe(true);
+});
+
+test("store.require returns an isolated copy — mutations do not affect stored state until update is called", () => {
+  const original = createDomainTable({ name: "Isolation test" });
+  memoryStore.create(original);
+
+  const copy = memoryStore.require(original.id);
+  copy.name = "mutated";
+
+  const stored = memoryStore.require(original.id);
+  expect(stored.name).toBe("Isolation test");
+});
+
+test("failed HTTP mutation does not persist partial state", async () => {
+  const table = await createTable("Atomic test");
+  const { zone } = await addZone(table.id, { name: "Draw" });
+  await addDeck(table.id, zone.id);
+
+  const before = await getTable(table.id);
+  const cardCount = before.zones.find((z) => z.id === zone.id)!.count;
+
+  const response = await api("POST", `/tables/${table.id}/move`, {
+    fromZoneId: zone.id,
+    toZoneId: zone.id,
+    selection: { type: "zoneCount", zoneId: zone.id, count: 999, from: "top" },
+    to: "bottom",
+  });
+  expect(response.status).toBe(409);
+
+  const after = await getTable(table.id);
+  expect(after.zones.find((z) => z.id === zone.id)!.count).toBe(cardCount);
 });
