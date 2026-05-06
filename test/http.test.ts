@@ -173,15 +173,32 @@ test("dealer events are public summaries without metadata", async () => {
   expect(body.events.every((event) => !("metadata" in event))).toBe(true);
 });
 
-test("store.require returns an isolated copy — mutations do not affect stored state until update is called", () => {
+test("store read and write boundaries isolate table references", () => {
   const original = createDomainTable({ name: "Isolation test" });
-  memoryStore.create(original);
+  const created = memoryStore.create(original);
+
+  original.name = "mutated original";
+  created.name = "mutated created";
+  expect(memoryStore.require(original.id).name).toBe("Isolation test");
+
+  const optional = memoryStore.get(original.id);
+  expect(optional).toBeDefined();
+  optional!.name = "mutated get";
+  expect(memoryStore.require(original.id).name).toBe("Isolation test");
 
   const copy = memoryStore.require(original.id);
   copy.name = "mutated";
+  expect(memoryStore.require(original.id).name).toBe("Isolation test");
 
-  const stored = memoryStore.require(original.id);
-  expect(stored.name).toBe("Isolation test");
+  const listed = memoryStore.list()[0]!;
+  listed.name = "mutated list";
+  expect(memoryStore.require(original.id).name).toBe("Isolation test");
+
+  const update = memoryStore.require(original.id);
+  update.name = "Updated";
+  memoryStore.update(update);
+  update.name = "mutated after update";
+  expect(memoryStore.require(original.id).name).toBe("Updated");
 });
 
 test("failed HTTP mutation does not persist partial state", async () => {

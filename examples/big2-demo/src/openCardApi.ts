@@ -51,6 +51,10 @@ export type ApiLogEntry = {
   detail?: string;
 };
 
+type CardSelection =
+  | { type: "cardIds"; cardIds: string[] }
+  | { type: "zoneCount"; zoneId: string; count: number; from: "top" | "bottom" };
+
 export class OpenCardApi {
   private static nextLogId = 1;
 
@@ -120,7 +124,7 @@ export class OpenCardApi {
     body: {
       fromZoneId: string;
       toZoneId: string;
-      selection: { type: "count"; count: number; from: "top" | "bottom" } | { type: "cardIds"; cardIds: string[] };
+      selection: CardSelection;
       to: "top" | "bottom";
       actorPlayerId?: string;
     },
@@ -131,7 +135,7 @@ export class OpenCardApi {
   async flipCards(
     tableId: string,
     body: {
-      selection: { type: "cardIds"; cardIds: string[] } | { type: "zoneCount"; zoneId: string; count: number; from: "top" | "bottom" };
+      selection: CardSelection;
       face: "up" | "down";
       actorPlayerId?: string;
     },
