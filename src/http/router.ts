@@ -14,7 +14,7 @@ import {
   setDealer,
   shuffleZone,
 } from "../domain/operations";
-import { createTable } from "../domain/table";
+import { createTable, type Table } from "../domain/table";
 import { publicEvents } from "../domain/events";
 import { projectTable } from "../domain/visibility";
 import type { TableStore } from "../store/memoryStore";
@@ -38,6 +38,18 @@ import {
 } from "./schemas";
 
 export function createRouter(store: TableStore = memoryStore) {
+  async function actorMutation<T extends { actorPlayerId?: string }>(
+    request: Request,
+    schema: z.ZodType<T>,
+    table: Table,
+    operate: (body: T) => Record<string, unknown> | undefined,
+  ): Promise<Response> {
+    const body = await parseBody(request, schema);
+    const extra = operate(body) ?? {};
+    store.update(table);
+    return json({ ...extra, table: projectTable(table, body.actorPlayerId) });
+  }
+
   return async function handleRequest(request: Request): Promise<Response> {
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: corsHeaders });
@@ -93,12 +105,14 @@ export function createRouter(store: TableStore = memoryStore) {
       if (segments.length === 3 && segments[2] === "players") {
         const body = await parseBody(request, addPlayerSchema);
         const player = addPlayer(table, body);
+        store.update(table);
         return json({ player, table: projectTable(table, player.id) }, 201);
       }
 
       if (segments.length === 3 && segments[2] === "zones") {
         const body = await parseBody(request, createZoneSchema);
         const zone = createZone(table, body);
+        store.update(table);
         return json({ zone, table: projectTable(table, zone.ownerPlayerId) }, 201);
       }
 
@@ -159,17 +173,6 @@ export function createRouter(store: TableStore = memoryStore) {
 }
 
 export const handleRequest = createRouter(memoryStore);
-
-async function actorMutation<T extends { actorPlayerId?: string }>(
-  request: Request,
-  schema: z.ZodType<T>,
-  table: ReturnType<TableStore["require"]>,
-  operate: (body: T) => Record<string, unknown> | undefined,
-): Promise<Response> {
-  const body = await parseBody(request, schema);
-  const extra = operate(body) ?? {};
-  return json({ ...extra, table: projectTable(table, body.actorPlayerId) });
-}
 
 async function parseBody<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
   const text = await request.text();
