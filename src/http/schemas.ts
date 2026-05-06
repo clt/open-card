@@ -75,12 +75,6 @@ export const cutZoneSchema = z.object({
   actorPlayerId: idSchema.optional(),
 });
 
-const countMoveSelectionSchema = z.object({
-  type: z.literal("count"),
-  count: z.number().int().min(1),
-  from: z.enum(["top", "bottom"]).default("top"),
-});
-
 const cardIdsSelectionSchema = z.object({
   type: z.literal("cardIds"),
   cardIds: z.array(idSchema).min(1),
@@ -93,10 +87,12 @@ const zoneCountSelectionSchema = z.object({
   from: z.enum(["top", "bottom"]).default("top"),
 });
 
+export const cardSelectionSchema = z.discriminatedUnion("type", [cardIdsSelectionSchema, zoneCountSelectionSchema]);
+
 export const moveCardsSchema = z.object({
   fromZoneId: idSchema,
   toZoneId: idSchema,
-  selection: z.discriminatedUnion("type", [countMoveSelectionSchema, cardIdsSelectionSchema]),
+  selection: cardSelectionSchema,
   to: z.enum(["top", "bottom"]).default("bottom"),
   actorPlayerId: idSchema.optional(),
 });
@@ -109,8 +105,6 @@ export const dealCardsSchema = z.object({
   to: z.enum(["top", "bottom"]).default("bottom"),
   actorPlayerId: idSchema.optional(),
 });
-
-export const cardSelectionSchema = z.discriminatedUnion("type", [cardIdsSelectionSchema, zoneCountSelectionSchema]);
 
 export const flipCardsSchema = z.object({
   selection: cardSelectionSchema,

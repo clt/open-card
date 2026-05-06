@@ -15,7 +15,7 @@ test("owner sees private hand card identity while other viewers see placeholders
   moveCards(table, {
     fromZoneId: draw.id,
     toZoneId: aliceHand.id,
-    selection: { type: "count", count: 1, from: "top" },
+    selection: { type: "zoneCount", zoneId: draw.id, count: 1, from: "top" },
     to: "bottom",
   });
 
