@@ -165,11 +165,10 @@ async function actorMutation<T extends { actorPlayerId?: string }>(
   schema: z.ZodType<T>,
   table: ReturnType<TableStore["require"]>,
   operate: (body: T) => Record<string, unknown> | undefined,
-  status = 200,
 ): Promise<Response> {
   const body = await parseBody(request, schema);
   const extra = operate(body) ?? {};
-  return json({ ...extra, table: projectTable(table, body.actorPlayerId) }, status);
+  return json({ ...extra, table: projectTable(table, body.actorPlayerId) });
 }
 
 async function parseBody<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
