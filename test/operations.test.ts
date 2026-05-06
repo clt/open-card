@@ -162,7 +162,7 @@ test("deal rejects when the source zone has insufficient cards", () => {
       from: "top",
       to: "bottom",
     }),
-  ).toThrow();
+  ).toThrow("Cannot deal");
 
   expect(draw.cardIds).toHaveLength(52);
   expect(north.cardIds).toHaveLength(0);
