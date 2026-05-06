@@ -103,65 +103,52 @@ export function createRouter(store: TableStore = memoryStore) {
       }
 
       if (segments.length === 3 && segments[2] === "decks") {
-        const body = await parseBody(request, addDeckSchema);
-        addStandardDeck(table, body);
-        return json({ cardsAdded: 52, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, addDeckSchema, table, (body) => {
+          addStandardDeck(table, body);
+          return { cardsAdded: 52 };
+        });
       }
 
       if (segments.length === 3 && segments[2] === "dealer") {
-        const body = await parseBody(request, setDealerSchema);
-        const dealer = setDealer(table, body);
-        return json({ dealer, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, setDealerSchema, table, (body) => ({ dealer: setDealer(table, body) }));
       }
 
       if (segments.length === 4 && segments[2] === "dealer" && segments[3] === "pass") {
-        const body = await parseBody(request, passDealerSchema);
-        const dealer = passDealerPosition(table, body);
-        return json({ dealer, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, passDealerSchema, table, (body) => ({ dealer: passDealerPosition(table, body) }));
       }
 
       if (segments.length === 5 && segments[2] === "zones" && segments[3] !== undefined) {
         if (segments[4] === "shuffle") {
-          const body = await parseBody(request, shuffleZoneSchema);
-          shuffleZone(table, { zoneId: segments[3], actorPlayerId: body.actorPlayerId });
-          return json({ table: projectTable(table, body.actorPlayerId) });
+          return await actorMutation(request, shuffleZoneSchema, table, (body) => {
+            shuffleZone(table, { zoneId: segments[3]!, actorPlayerId: body.actorPlayerId });
+          });
         }
 
         if (segments[4] === "cut") {
-          const body = await parseBody(request, cutZoneSchema);
-          cutZone(table, { zoneId: segments[3], at: body.at, actorPlayerId: body.actorPlayerId });
-          return json({ table: projectTable(table, body.actorPlayerId) });
+          return await actorMutation(request, cutZoneSchema, table, (body) => {
+            cutZone(table, { zoneId: segments[3]!, at: body.at, actorPlayerId: body.actorPlayerId });
+          });
         }
       }
 
       if (segments.length === 3 && segments[2] === "move") {
-        const body = await parseBody(request, moveCardsSchema);
-        const cardIds = moveCards(table, body);
-        return json({ cardIds, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, moveCardsSchema, table, (body) => ({ cardIds: moveCards(table, body) }));
       }
 
       if (segments.length === 3 && segments[2] === "deal") {
-        const body = await parseBody(request, dealCardsSchema);
-        const cardIds = dealCards(table, body);
-        return json({ cardIds, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, dealCardsSchema, table, (body) => ({ cardIds: dealCards(table, body) }));
       }
 
       if (segments.length === 3 && segments[2] === "flip") {
-        const body = await parseBody(request, flipCardsSchema);
-        const cardIds = flipCards(table, body);
-        return json({ cardIds, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, flipCardsSchema, table, (body) => ({ cardIds: flipCards(table, body) }));
       }
 
       if (segments.length === 3 && segments[2] === "reveal") {
-        const body = await parseBody(request, revealCardsSchema);
-        const cardIds = revealCards(table, body);
-        return json({ cardIds, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, revealCardsSchema, table, (body) => ({ cardIds: revealCards(table, body) }));
       }
 
       if (segments.length === 3 && segments[2] === "hide") {
-        const body = await parseBody(request, hideCardsSchema);
-        const cardIds = hideCards(table, body);
-        return json({ cardIds, table: projectTable(table, body.actorPlayerId) });
+        return await actorMutation(request, hideCardsSchema, table, (body) => ({ cardIds: hideCards(table, body) }));
       }
 
       return notFoundResponse();
@@ -172,6 +159,18 @@ export function createRouter(store: TableStore = memoryStore) {
 }
 
 export const handleRequest = createRouter(memoryStore);
+
+async function actorMutation<T extends { actorPlayerId?: string }>(
+  request: Request,
+  schema: z.ZodType<T>,
+  table: ReturnType<TableStore["require"]>,
+  operate: (body: T) => Record<string, unknown> | undefined,
+  status = 200,
+): Promise<Response> {
+  const body = await parseBody(request, schema);
+  const extra = operate(body) ?? {};
+  return json({ ...extra, table: projectTable(table, body.actorPlayerId) }, status);
+}
 
 async function parseBody<T>(request: Request, schema: z.ZodType<T>): Promise<T> {
   const text = await request.text();
