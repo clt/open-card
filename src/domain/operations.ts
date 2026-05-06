@@ -11,19 +11,6 @@ import {
 } from "./table";
 import type { DealerActor, DealerState, DefaultVisibility, Player, Table, Zone } from "./table";
 
-export type CountMoveSelection = {
-  type: "count";
-  count: number;
-  from: "top" | "bottom";
-};
-
-export type MoveSelection =
-  | CountMoveSelection
-  | {
-      type: "cardIds";
-      cardIds: string[];
-    };
-
 export type CardSelection =
   | {
       type: "cardIds";
@@ -231,7 +218,7 @@ export function moveCards(
   input: {
     fromZoneId: string;
     toZoneId: string;
-    selection: MoveSelection;
+    selection: CardSelection;
     to: "top" | "bottom";
     actorPlayerId?: string;
   },
@@ -297,7 +284,7 @@ export function dealCards(
         ...moveCardsInternal(table, {
           fromZoneId: input.fromZoneId,
           toZoneId: targetZone.id,
-          selection: { type: "count", count: 1, from: input.from },
+          selection: { type: "zoneCount", zoneId: input.fromZoneId, count: 1, from: input.from },
           to: input.to,
         }),
       );
@@ -420,7 +407,7 @@ function moveCardsInternal(
   input: {
     fromZoneId: string;
     toZoneId: string;
-    selection: MoveSelection;
+    selection: CardSelection;
     to: "top" | "bottom";
   },
 ): string[] {
@@ -446,8 +433,11 @@ function moveCardsInternal(
   return selectedCardIds;
 }
 
-function selectMoveCards(zone: Zone, selection: MoveSelection): string[] {
-  if (selection.type === "count") {
+function selectMoveCards(zone: Zone, selection: CardSelection): string[] {
+  if (selection.type === "zoneCount") {
+    if (selection.zoneId !== zone.id) {
+      badRequest("Selection zoneId must match fromZoneId.");
+    }
     return selectFromZoneByCount(zone, selection.count, selection.from);
   }
 

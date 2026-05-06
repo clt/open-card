@@ -702,7 +702,7 @@ export function acceptanceResultsPage(): string {
         await request("POST", "/tables/" + tableId + "/move", {
           fromZoneId: drawZoneId,
           toZoneId: burnZoneId,
-          selection: { type: "count", count: 1, from: "top" },
+          selection: { type: "zoneCount", zoneId: drawZoneId, count: 1, from: "top" },
           to: "bottom",
           actorPlayerId: actorPlayerId,
         });
@@ -712,7 +712,7 @@ export function acceptanceResultsPage(): string {
         await request("POST", "/tables/" + tableId + "/move", {
           fromZoneId: drawZoneId,
           toZoneId: boardZoneId,
-          selection: { type: "count", count: count, from: "top" },
+          selection: { type: "zoneCount", zoneId: drawZoneId, count: count, from: "top" },
           to: "bottom",
           actorPlayerId: actorPlayerId,
         });

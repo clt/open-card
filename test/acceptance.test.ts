@@ -205,7 +205,7 @@ async function burnCards(tableId: string, drawZoneId: string, burnZoneId: string
   const response = await api("POST", `/tables/${tableId}/move`, {
     fromZoneId: drawZoneId,
     toZoneId: burnZoneId,
-    selection: { type: "count", count: 1, from: "top" },
+    selection: { type: "zoneCount", zoneId: drawZoneId, count: 1, from: "top" },
     to: "bottom",
     actorPlayerId,
   });
@@ -223,7 +223,7 @@ async function moveToBoard(
   const response = await api("POST", `/tables/${tableId}/move`, {
     fromZoneId: drawZoneId,
     toZoneId: boardZoneId,
-    selection: { type: "count", count, from: "top" },
+    selection: { type: "zoneCount", zoneId: drawZoneId, count, from: "top" },
     to: "bottom",
     actorPlayerId,
   });

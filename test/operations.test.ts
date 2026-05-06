@@ -5,8 +5,11 @@ import {
   createZone,
   cutZone,
   dealCards,
+  flipCards,
+  hideCards,
   moveCards,
   passDealerPosition,
+  revealCards,
   setDealer,
   shuffleZone,
 } from "../src/domain/operations";
@@ -48,13 +51,13 @@ test("move supports count from top and bottom while preserving order", () => {
   const topMoved = moveCards(table, {
     fromZoneId: draw.id,
     toZoneId: discard.id,
-    selection: { type: "count", count: 2, from: "top" },
+    selection: { type: "zoneCount", zoneId: draw.id, count: 2, from: "top" },
     to: "bottom",
   });
   const bottomMoved = moveCards(table, {
     fromZoneId: draw.id,
     toZoneId: discard.id,
-    selection: { type: "count", count: 2, from: "bottom" },
+    selection: { type: "zoneCount", zoneId: draw.id, count: 2, from: "bottom" },
     to: "bottom",
   });
 
@@ -199,4 +202,135 @@ test("passing dealer position requires an existing position and does not mutate 
     actor: { type: "player", playerId: alice.id },
     positionPlayerId: null,
   });
+});
+
+test("flip with zoneCount selects cards from the named zone", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const original = [...draw.cardIds];
+
+  const flipped = flipCards(table, {
+    selection: { type: "zoneCount", zoneId: draw.id, count: 3, from: "top" },
+    face: "up",
+  });
+
+  expect(flipped).toEqual([original[0]!, original[1]!, original[2]!]);
+  expect(flipped.every((id) => table.cards[id]!.face === "up")).toBe(true);
+  expect(table.cards[original[3]!]!.face).toBe("down");
+});
+
+test("flip with zoneCount from bottom selects the tail of the zone", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const original = [...draw.cardIds];
+
+  const flipped = flipCards(table, {
+    selection: { type: "zoneCount", zoneId: draw.id, count: 2, from: "bottom" },
+    face: "up",
+  });
+
+  expect(flipped).toEqual([original[50]!, original[51]!]);
+});
+
+test("reveal with zoneCount grants visibility to specified players", () => {
+  const table = createTable();
+  const alice = addPlayer(table, { name: "Alice" });
+  const bob = addPlayer(table, { name: "Bob" });
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const [first, second] = draw.cardIds;
+
+  revealCards(table, {
+    selection: { type: "zoneCount", zoneId: draw.id, count: 2, from: "top" },
+    to: { playerIds: [alice.id] },
+  });
+
+  expect(table.cards[first!]!.visibility.playerIds).toContain(alice.id);
+  expect(table.cards[first!]!.visibility.playerIds).not.toContain(bob.id);
+  expect(table.cards[second!]!.visibility.playerIds).toContain(alice.id);
+});
+
+test("hide with zoneCount removes visibility from specified players", () => {
+  const table = createTable();
+  const alice = addPlayer(table, { name: "Alice" });
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const cardId = draw.cardIds[0]!;
+
+  revealCards(table, { selection: { type: "cardIds", cardIds: [cardId] }, to: { playerIds: [alice.id] } });
+  expect(table.cards[cardId]!.visibility.playerIds).toContain(alice.id);
+
+  hideCards(table, {
+    selection: { type: "zoneCount", zoneId: draw.id, count: 1, from: "top" },
+    from: { playerIds: [alice.id] },
+  });
+
+  expect(table.cards[cardId]!.visibility.playerIds).not.toContain(alice.id);
+});
+
+test("zoneCount selection rejects a non-existent zone", () => {
+  const table = createTable();
+
+  expect(() =>
+    flipCards(table, {
+      selection: { type: "zoneCount", zoneId: "missing_zone", count: 1, from: "top" },
+      face: "up",
+    }),
+  ).toThrow("missing_zone");
+});
+
+test("zoneCount selection rejects a count that exceeds the zone size", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+
+  expect(() =>
+    flipCards(table, {
+      selection: { type: "zoneCount", zoneId: draw.id, count: 53, from: "top" },
+      face: "up",
+    }),
+  ).toThrow();
+});
+
+test("cardIds selection rejects duplicate IDs", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  addStandardDeck(table, { zoneId: draw.id });
+  const cardId = draw.cardIds[0]!;
+
+  expect(() =>
+    flipCards(table, {
+      selection: { type: "cardIds", cardIds: [cardId, cardId] },
+      face: "up",
+    }),
+  ).toThrow("cardIds must be unique");
+});
+
+test("cardIds selection rejects a non-existent card", () => {
+  const table = createTable();
+
+  expect(() =>
+    flipCards(table, {
+      selection: { type: "cardIds", cardIds: ["missing_card"] },
+      face: "up",
+    }),
+  ).toThrow("missing_card");
+});
+
+test("move rejects zoneCount selection whose zoneId does not match fromZoneId", () => {
+  const table = createTable();
+  const draw = createZone(table, { name: "Draw" });
+  const hand = createZone(table, { name: "Hand" });
+  addStandardDeck(table, { zoneId: draw.id });
+
+  expect(() =>
+    moveCards(table, {
+      fromZoneId: draw.id,
+      toZoneId: hand.id,
+      selection: { type: "zoneCount", zoneId: hand.id, count: 1, from: "top" },
+      to: "bottom",
+    }),
+  ).toThrow("fromZoneId");
 });

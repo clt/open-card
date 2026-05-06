@@ -29,7 +29,7 @@ test("HTTP creates table, player, zone, deck, and projected table state", async 
   const move = await api("POST", `/tables/${table.id}/move`, {
     fromZoneId: draw.zone.id,
     toZoneId: handZone.zone.id,
-    selection: { type: "count", count: 1, from: "top" },
+    selection: { type: "zoneCount", zoneId: draw.zone.id, count: 1, from: "top" },
     to: "bottom",
     actorPlayerId: player.id,
   });
@@ -83,7 +83,7 @@ test("HTTP returns validation, not found, and conflict errors", async () => {
   const conflict = await api("POST", `/tables/${table.id}/move`, {
     fromZoneId: zone.id,
     toZoneId: zone.id,
-    selection: { type: "count", count: 53, from: "top" },
+    selection: { type: "zoneCount", zoneId: zone.id, count: 53, from: "top" },
     to: "bottom",
   });
 
@@ -125,7 +125,7 @@ test("event endpoint exposes safe summaries without card identity metadata", asy
   await api("POST", `/tables/${table.id}/move`, {
     fromZoneId: draw.zone.id,
     toZoneId: hand.zone.id,
-    selection: { type: "count", count: 1, from: "top" },
+    selection: { type: "zoneCount", zoneId: draw.zone.id, count: 1, from: "top" },
     to: "bottom",
     actorPlayerId: player.id,
   });
