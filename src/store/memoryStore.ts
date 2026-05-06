@@ -14,12 +14,14 @@ export class MemoryTableStore implements TableStore {
   private readonly tables = new Map<string, Table>();
 
   create(table: Table): Table {
-    this.tables.set(table.id, table);
-    return structuredClone(table);
+    const storedTable = structuredClone(table);
+    this.tables.set(storedTable.id, storedTable);
+    return structuredClone(storedTable);
   }
 
   get(tableId: string): Table | undefined {
-    return this.tables.get(tableId);
+    const table = this.tables.get(tableId);
+    return table === undefined ? undefined : structuredClone(table);
   }
 
   require(tableId: string): Table {
@@ -29,11 +31,11 @@ export class MemoryTableStore implements TableStore {
       notFound(`Table ${tableId} not found.`);
     }
 
-    return structuredClone(table);
+    return table;
   }
 
   update(table: Table): void {
-    this.tables.set(table.id, table);
+    this.tables.set(table.id, structuredClone(table));
   }
 
   list(): Table[] {
