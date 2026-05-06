@@ -15,7 +15,7 @@ export class MemoryTableStore implements TableStore {
 
   create(table: Table): Table {
     this.tables.set(table.id, table);
-    return table;
+    return structuredClone(table);
   }
 
   get(tableId: string): Table | undefined {
@@ -37,7 +37,7 @@ export class MemoryTableStore implements TableStore {
   }
 
   list(): Table[] {
-    return [...this.tables.values()];
+    return [...this.tables.values()].map((t) => structuredClone(t));
   }
 
   reset(): void {
