@@ -29,6 +29,7 @@ Set `BIG2_DEMO_PORT` to serve the sample UI on another port. The UI defaults to 
 - Suit order is diamonds, clubs, hearts, spades.
 - Five-card hand order is straight, flush, full house, four of a kind, straight flush.
 - Three consecutive passes clear the active play, and the last player who played leads the next trick.
+- The trick winner becomes the Open Card dealer actor and dealer position for the next lead.
 - The first player to empty their hand wins.
 
 The rules live in `examples/big2-demo/src/big2.ts`; Open Card still models only physical table operations.

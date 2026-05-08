@@ -200,7 +200,7 @@ async function startNewGame(): Promise<void> {
 
   const actorPlayerId = players[0]!.id;
   await client.setDealer(table.id, {
-    actor: { type: "nonPlayer", name: "Big 2 demo" },
+    actor: { type: "player", playerId: actorPlayerId },
     positionPlayerId: actorPlayerId,
     actorPlayerId,
   });
@@ -249,6 +249,7 @@ async function startNewGame(): Promise<void> {
     turnNumber: 1,
   };
   state.manualPlayerId = starter.player.id;
+  appendGameLog(`${players[0]!.name} deals the opening hand.`);
   appendGameLog(`${starter.player.name} opens with 3D.`);
   state.status = "Game ready.";
 }
@@ -316,7 +317,7 @@ async function passTurn(): Promise<void> {
     game.activePlay = null;
     game.passes = 0;
     roundWinnerName = leadPlayer.name;
-    appendGameLog(`${leadPlayer.name} takes the trick and leads next.`);
+    appendGameLog(`${leadPlayer.name} takes the trick and deals next.`);
     await refreshSnapshot();
   } else {
     game.currentPlayerId = nextPlayerId(player.id);
@@ -381,7 +382,7 @@ async function commitPlay(player: Player, combo: Combo, cards: KnownCard[]): Pro
     game.activePlay = null;
     game.winnerPlayerId = player.id;
     state.status = `${player.name} wins.`;
-    appendGameLog(`${player.name} wins the hand.`);
+    appendGameLog(`${player.name} wins the hand and stays dealer.`);
     return;
   }
 
@@ -424,6 +425,15 @@ async function finishCurrentRound(winner: Player, winningPlay: ActivePlay, actor
   });
   state.currentRoundTurns = [];
   await clearCurrentPlay(actorPlayerId, winningPlay.cards.length);
+  await setRoundDealer(winner, actorPlayerId);
+}
+
+async function setRoundDealer(winner: Player, actorPlayerId: string): Promise<void> {
+  await api().setDealer(requireTableId(), {
+    actor: { type: "player", playerId: winner.id },
+    positionPlayerId: winner.id,
+    actorPlayerId,
+  });
 }
 
 function appendRoundPlay(player: Player, combo: Combo, cards: KnownCard[]): void {
@@ -545,9 +555,10 @@ function renderTableMeta(): void {
   const currentPlayer = playerById(game.currentPlayerId);
   const winner = game.winnerPlayerId === null ? null : playerById(game.winnerPlayerId);
   const active = game.activePlay === null ? "open lead" : `${game.activePlay.playerName} ${game.activePlay.combo.label}`;
+  const dealer = dealerDisplayName(snapshot.table);
   tableMeta.textContent = winner === null
-    ? `Turn ${game.turnNumber} | ${currentPlayer.name} to act | ${active} | passes ${game.passes}`
-    : `Winner: ${winner.name} | table ${snapshot.table.id}`;
+    ? `Turn ${game.turnNumber} | Dealer: ${dealer} | ${currentPlayer.name} to act | ${active} | passes ${game.passes}`
+    : `Winner: ${winner.name} | Dealer: ${dealer} | table ${snapshot.table.id}`;
 }
 
 function renderPlayers(): void {
@@ -565,16 +576,30 @@ function renderPlayers(): void {
     const isCurrent = state.game?.currentPlayerId === player.id;
     const isManual = state.manualPlayerId === player.id;
     const isWinner = state.game?.winnerPlayerId === player.id;
-    panel.className = ["player-panel", isCurrent ? "is-current" : "", isWinner ? "is-winner" : ""].filter(Boolean).join(" ");
+    const isDealer = state.snapshot.table.dealer.positionPlayerId === player.id;
+    panel.className = ["player-panel", isCurrent ? "is-current" : "", isWinner ? "is-winner" : "", isDealer ? "is-dealer" : ""]
+      .filter(Boolean)
+      .join(" ");
 
     const header = document.createElement("header");
     header.className = "player-header";
     const title = document.createElement("div");
     title.innerHTML = `<strong>${escapeHtml(player.name)}</strong><span>${hand.length} cards</span>`;
+    const badges = document.createElement("div");
+    badges.className = "seat-badges";
     const mode = document.createElement("span");
     mode.className = isManual ? "seat-mode manual" : "seat-mode";
     mode.textContent = isManual ? "manual" : "auto";
-    header.append(title, mode);
+    badges.append(mode);
+
+    if (isDealer) {
+      const dealer = document.createElement("span");
+      dealer.className = "seat-mode dealer";
+      dealer.textContent = "dealer";
+      badges.append(dealer);
+    }
+
+    header.append(title, badges);
 
     const cards = document.createElement("div");
     cards.className = "hand";
@@ -595,6 +620,29 @@ function renderPlayers(): void {
     panel.append(header, cards);
     playersGrid.append(panel);
   }
+}
+
+function dealerDisplayName(table: ProjectedTable): string {
+  const positionName = table.dealer.positionPlayerId === null ? null : playerNameFor(table.dealer.positionPlayerId);
+  const actorName = dealerActorName(table);
+
+  if (positionName !== null && actorName !== null && positionName !== actorName) {
+    return `${positionName} (${actorName})`;
+  }
+
+  return positionName ?? actorName ?? "None";
+}
+
+function dealerActorName(table: ProjectedTable): string | null {
+  if (table.dealer.actor?.type === "player") {
+    return playerNameFor(table.dealer.actor.playerId);
+  }
+
+  return table.dealer.actor?.name ?? null;
+}
+
+function playerNameFor(playerId: string): string {
+  return state.seats.find((seat) => seat.player.id === playerId)?.player.name ?? "Unknown";
 }
 
 function renderCurrentPlay(): void {
