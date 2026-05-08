@@ -120,7 +120,9 @@ export class OpenCardApi {
     body: {
       fromZoneId: string;
       toZoneId: string;
-      selection: { type: "count"; count: number; from: "top" | "bottom" } | { type: "cardIds"; cardIds: string[] };
+      selection:
+        | { type: "zoneCount"; zoneId: string; count: number; from: "top" | "bottom" }
+        | { type: "cardIds"; cardIds: string[] };
       to: "top" | "bottom";
       actorPlayerId?: string;
     },

@@ -8,6 +8,7 @@ import {
   api,
   createTable,
   getTable,
+  json,
   passDealer,
   setDealer,
   zoneByName,
@@ -17,7 +18,7 @@ afterEach(() => {
   memoryStore.reset();
 });
 
-test("acceptance: non-player dealer keeps dealing while player position passes and wraps", async () => {
+test("acceptance: non-player dealer actor can pass player position and wrap", async () => {
   const table = await createTable("Dealer rotation table");
   const alice = (await addPlayer(table.id, "Alice")).player;
   const bob = (await addPlayer(table.id, "Bob")).player;
@@ -41,13 +42,10 @@ test("acceptance: non-player dealer keeps dealing while player position passes a
   expect((await passDealer(table.id)).dealer.positionPlayerId).toBe(alice.id);
 });
 
-test("acceptance: dealer actor is independent from position and does not gate generic dealing", async () => {
-  const table = await createTable("Dealer generic deal table");
+test("acceptance: player dealer actor is independent from dealer position", async () => {
+  const table = await createTable("Dealer actor independence table");
   const alice = (await addPlayer(table.id, "Alice")).player;
   const bob = (await addPlayer(table.id, "Bob")).player;
-  const draw = (await addZone(table.id, { name: "Draw" })).zone;
-  const aliceHand = (await addZone(table.id, { name: "Alice Hand", ownerPlayerId: alice.id })).zone;
-  const bobHand = (await addZone(table.id, { name: "Bob Hand", ownerPlayerId: bob.id })).zone;
 
   await setDealer(table.id, {
     actor: { type: "player", playerId: alice.id },
@@ -57,6 +55,25 @@ test("acceptance: dealer actor is independent from position and does not gate ge
   expect((await passDealer(table.id, { actorPlayerId: bob.id })).dealer).toEqual({
     actor: { type: "player", playerId: alice.id },
     positionPlayerId: bob.id,
+  });
+
+  expect((await getTable(table.id)).dealer).toEqual({
+    actor: { type: "player", playerId: alice.id },
+    positionPlayerId: bob.id,
+  });
+});
+
+test("acceptance: existing deal operation remains generic with dealer metadata", async () => {
+  const table = await createTable("Dealer generic deal table");
+  const alice = (await addPlayer(table.id, "Alice")).player;
+  const bob = (await addPlayer(table.id, "Bob")).player;
+  const draw = (await addZone(table.id, { name: "Draw" })).zone;
+  const aliceHand = (await addZone(table.id, { name: "Alice Hand", ownerPlayerId: alice.id })).zone;
+  const bobHand = (await addZone(table.id, { name: "Bob Hand", ownerPlayerId: bob.id })).zone;
+
+  await setDealer(table.id, {
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: alice.id,
   });
 
   const deckResponse = await addDeck(table.id, draw.id);
@@ -75,13 +92,54 @@ test("acceptance: dealer actor is independent from position and does not gate ge
   const projected = await getTable(table.id);
 
   expect(projected.dealer).toEqual({
-    actor: { type: "player", playerId: alice.id },
-    positionPlayerId: bob.id,
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: alice.id,
   });
   expect(zoneByName(projected, "Alice Hand").count).toBe(2);
   expect(zoneByName(projected, "Bob Hand").count).toBe(2);
+  expect(zoneByName(projected, "Alice Hand").cards.map((card) => card.id)).toEqual([
+    originalDeckIds[0]!,
+    originalDeckIds[2]!,
+  ]);
+  expect(zoneByName(projected, "Bob Hand").cards.map((card) => card.id)).toEqual([
+    originalDeckIds[1]!,
+    originalDeckIds[3]!,
+  ]);
   expect([...allCardIds(projected)].sort()).toEqual([...originalDeckIds].sort());
   expect(new Set(allCardIds(projected)).size).toBe(52);
+});
+
+test("acceptance: dealer public events are safe and useful", async () => {
+  const table = await createTable("Dealer event table");
+  const alice = (await addPlayer(table.id, "Alice")).player;
+  const bob = (await addPlayer(table.id, "Bob")).player;
+
+  await setDealer(table.id, {
+    actor: { type: "nonPlayer", name: "House" },
+    positionPlayerId: alice.id,
+  });
+  await passDealer(table.id, { actorPlayerId: bob.id });
+
+  const response = await api("GET", `/tables/${table.id}/events`);
+  const body = await json<{ events: Array<Record<string, unknown>> }>(response);
+  const serialized = JSON.stringify(body);
+
+  expect(response.status).toBe(200);
+  expect(body.events).toContainEqual(
+    expect.objectContaining({
+      type: "dealer.updated",
+      summary: "Dealer updated.",
+    }),
+  );
+  expect(body.events).toContainEqual(
+    expect.objectContaining({
+      type: "dealer.passed",
+      summary: "Dealer position passed from Alice to Bob.",
+    }),
+  );
+  expect(body.events.every((event) => !("metadata" in event))).toBe(true);
+  expect(serialized).not.toContain("cardIds");
+  expect(serialized).not.toContain("code");
 });
 
 test("acceptance: 5 players can physically deal Texas hold'em through the generic API", async () => {

@@ -401,7 +401,7 @@ async function clearCurrentPlay(actorPlayerId: string, count = state.snapshot?.c
   await api().moveCards(requireTableId(), {
     fromZoneId: zones.currentPlay,
     toZoneId: zones.finishedPile,
-    selection: { type: "count", count, from: "top" },
+    selection: { type: "zoneCount", zoneId: zones.currentPlay, count, from: "top" },
     to: "bottom",
     actorPlayerId,
   });

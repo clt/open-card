@@ -14,10 +14,13 @@ test("root page displays acceptance tests and results shell", async () => {
   expect(response.status).toBe(200);
   expect(response.headers.get("content-type")).toContain("text/html");
   expect(body).toContain("Acceptance Results");
-  expect(body).toContain("Dealer");
+  expect(body).toContain("Dealer: non-player actor");
+  expect(body).toContain("Dealer: player actor");
+  expect(body).toContain("Dealer: generic deal");
+  expect(body).toContain("Dealer: public events");
   expect(body).toContain("Texas hold'em");
   expect(body).toContain("鋤大弟");
-  expect(body).toContain("0/3");
+  expect(body).toContain("0/6");
   expect(body).toContain("data-testid=\"acceptance-results\"");
 });
 
