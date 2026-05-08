@@ -623,15 +623,22 @@ function renderPlayers(): void {
 }
 
 function dealerDisplayName(table: ProjectedTable): string {
-  if (table.dealer.positionPlayerId !== null) {
-    return playerNameFor(table.dealer.positionPlayerId);
+  const positionName = table.dealer.positionPlayerId === null ? null : playerNameFor(table.dealer.positionPlayerId);
+  const actorName = dealerActorName(table);
+
+  if (positionName !== null && actorName !== null && positionName !== actorName) {
+    return `${positionName} (${actorName})`;
   }
 
+  return positionName ?? actorName ?? "None";
+}
+
+function dealerActorName(table: ProjectedTable): string | null {
   if (table.dealer.actor?.type === "player") {
     return playerNameFor(table.dealer.actor.playerId);
   }
 
-  return table.dealer.actor?.name ?? "None";
+  return table.dealer.actor?.name ?? null;
 }
 
 function playerNameFor(playerId: string): string {
